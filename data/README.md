@@ -1,1 +1,1 @@
-Sample HRIR and test audio
+Sample HRIR / HRTF datasets
