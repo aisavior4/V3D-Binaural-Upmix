@@ -59,22 +59,13 @@ Every PR must include:
 * Safety checks
 
 
-
-### \## Product Priority
-
-
+## Product Priority
 
 The priority is not perfect Dolby Atmos reproduction.
-
 The priority is perceptible spatial improvement for ordinary users.
 
-
-
-#### \## Merge Policy
-
-
+## Merge Policy
 
 Do not merge automatically.
-
 Human approval is required.
 
