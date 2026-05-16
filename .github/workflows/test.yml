@@ -22,4 +22,4 @@ jobs:
 
       - name: Import test
         run: |
-          python -c "import numpy, scipy, soundfile; print('Dependencies OK')"
+          python -c "import numpy, scipy, soundfile; from src.v3d_engine import V3DEngine; from scripts.run_batch import run_batch; print('Dependencies + imports OK')"
