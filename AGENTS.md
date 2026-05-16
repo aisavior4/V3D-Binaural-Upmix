@@ -13,20 +13,21 @@ V5.x = Stereo Enhancement
 V6.x = Spatial Reconstruction for mobile video
 
 Current focus:
-- Camera perspective
-- Front / Rear distance
-- Body preservation
-- Width support
-- Elevation is postponed
+
+* Camera perspective
+* Front / Rear distance
+* Body preservation
+* Width support
+* Elevation is postponed
 
 ## Core Rules
 
-- Preserve dry signal.
-- Do not destroy center voice.
-- Do not use source separation in this phase.
-- Do not optimize only for analyzer metrics.
-- Listening perception is the final judge.
-- GitHub is the source of truth.
+* Preserve dry signal.
+* Do not destroy center voice.
+* Do not use source separation in this phase.
+* Do not optimize only for analyzer metrics.
+* Listening perception is the final judge.
+* GitHub is the source of truth.
 
 ## Roles
 
@@ -50,8 +51,30 @@ Does not decide final product direction.
 ## Pull Request Rules
 
 Every PR must include:
-- What changed
-- Why it changed
-- Expected listening effect
-- Affected presets
-- Safety checks
+
+* What changed
+* Why it changed
+* Expected listening effect
+* Affected presets
+* Safety checks
+
+
+
+### \## Product Priority
+
+
+
+The priority is not perfect Dolby Atmos reproduction.
+
+The priority is perceptible spatial improvement for ordinary users.
+
+
+
+#### \## Merge Policy
+
+
+
+Do not merge automatically.
+
+Human approval is required.
+
