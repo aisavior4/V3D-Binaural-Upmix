@@ -1,8 +1,7 @@
 numpy
 scipy
 soundfile
-pyloudnorm
-moviepy
 librosa
 ffmpeg-python
 tqdm
+pyloudnorm
