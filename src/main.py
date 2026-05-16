@@ -18,12 +18,15 @@ def process_single_file(input_wav: Path, output_wav: Path, preset: str) -> None:
     audio, sr = sf.read(input_wav)
     engine = V3DEngine(sr=sr)
     processed, _ = engine.process(audio, preset=preset)
+
     output_wav.parent.mkdir(parents=True, exist_ok=True)
     sf.write(output_wav, processed, sr)
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="V3D V6.0b1 Depth & Body processing CLI")
+    parser = argparse.ArgumentParser(
+        description="V3D V6.0b1 Depth & Body processing CLI",
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     single = subparsers.add_parser("single", help="Process a single WAV file")
@@ -38,10 +41,16 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-if __name__ == "__main__":
+def main() -> None:
     args = parse_args()
+
     if args.command == "single":
         process_single_file(args.input, args.output, args.preset)
+        print(f"Single-file processing complete: {args.output}")
     elif args.command == "batch":
         report = run_batch(args.input, args.output)
-        print(f"Batch complete. Report: {report}")
+        print(f"Batch processing complete. Report: {report}")
+
+
+if __name__ == "__main__":
+    main()

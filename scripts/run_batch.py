@@ -95,8 +95,18 @@ def run_batch(input_dir: Path, output_dir: Path) -> Path:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run V3D V6.0b1 WAV batch processing.")
-    parser.add_argument("--input", required=True, type=Path, help="Input folder containing WAV files")
-    parser.add_argument("--output", required=True, type=Path, help="Output folder")
+    parser.add_argument(
+        "--input",
+        required=True,
+        type=Path,
+        help="Input folder containing WAV files",
+    )
+    parser.add_argument(
+        "--output",
+        required=True,
+        type=Path,
+        help="Output folder",
+    )
     return parser.parse_args()
 
 
