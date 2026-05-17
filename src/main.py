@@ -25,14 +25,14 @@ def process_single_file(input_wav: Path, output_wav: Path, preset: str) -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="V3D V6.0b1 Depth & Body processing CLI",
+        description="V3D V6.0b2 parallel dry+wet processing CLI",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     single = subparsers.add_parser("single", help="Process a single WAV file")
     single.add_argument("--input", required=True, type=Path)
     single.add_argument("--output", required=True, type=Path)
-    single.add_argument("--preset", choices=["ZOOM", "WIDE", "DEEP"], required=True)
+    single.add_argument("--preset", choices=["ORIGINAL", "ZOOM", "WIDE", "DEEP"], required=True)
 
     batch = subparsers.add_parser("batch", help="Process all WAV files in a folder")
     batch.add_argument("--input", required=True, type=Path)

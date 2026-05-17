@@ -7,7 +7,7 @@ from scipy import signal
 
 
 class V3DEngine:
-    """V6.0b1 Depth & Body engine for mobile-video stereo sources."""
+    """V6.0b2 parallel dry+wet engine for mobile-video stereo sources."""
 
     def __init__(self, sr: int = 48000) -> None:
         self.sr = sr
@@ -46,7 +46,7 @@ class V3DEngine:
         self,
         x: np.ndarray,
         delay_ms: float = 0.25,
-        blend: float = 0.18,
+        blend: float = 0.10,
     ) -> np.ndarray:
         delay_samples = max(1, int(self.sr * delay_ms / 1000.0))
 
@@ -57,63 +57,59 @@ class V3DEngine:
         out_r = (1.0 - blend) * x[:, 1] + blend * delayed_l
         return np.stack([out_l, out_r], axis=1)
 
-    def process_zoom(self, x: np.ndarray) -> np.ndarray:
-        l = x[:, 0]
-        r = x[:, 1]
-        mid = 0.5 * (l + r)
-        side = 0.5 * (l - r)
+    def process_original(self, dry: np.ndarray) -> np.ndarray:
+        return dry.copy()
 
-        side *= 0.95
-        b, a = signal.butter(1, 3800 / (self.sr / 2.0), btype="high")
-        presence = signal.lfilter(b, a, mid) * 0.04
+    def process_zoom(self, dry: np.ndarray) -> np.ndarray:
+        mid = 0.5 * (dry[:, 0] + dry[:, 1])
+        b, a = signal.butter(1, 3600 / (self.sr / 2.0), btype="high")
+        presence = signal.lfilter(b, a, mid)
+        wet = np.stack([presence, presence], axis=1) * 0.03
+        return dry + wet
 
-        out_l = mid + side + presence
-        out_r = mid - side + presence
-        return np.stack([out_l, out_r], axis=1)
+    def process_wide(self, dry: np.ndarray) -> np.ndarray:
+        side = 0.5 * (dry[:, 0] - dry[:, 1])
+        b, a = signal.butter(1, 160.0 / (self.sr / 2.0), btype="high")
+        side_hp = signal.lfilter(b, a, side)
+        wet = np.stack([side_hp, -side_hp], axis=1) * 0.12
+        return dry + wet
 
-    def process_wide(self, x: np.ndarray) -> np.ndarray:
-        l = x[:, 0]
-        r = x[:, 1]
-        mid = 0.5 * (l + r)
-        side = 0.5 * (l - r)
+    def process_deep(self, dry: np.ndarray) -> np.ndarray:
+        delay_samples = int(self.sr * 0.010)
+        delayed = self.zero_pad_delay(dry, delay_samples)
+        dark_b, dark_a = signal.butter(1, 4200 / (self.sr / 2.0), btype="low")
+        dark_l = signal.lfilter(dark_b, dark_a, delayed[:, 0])
+        dark_r = signal.lfilter(dark_b, dark_a, delayed[:, 1])
+        wet = np.stack([dark_l, dark_r], axis=1) * 0.16
 
-        side *= 1.28
-        b, a = signal.butter(1, 180 / (self.sr / 2.0), btype="low")
-        body = signal.lfilter(b, a, mid) * 0.08
+        side = 0.5 * (dry[:, 0] - dry[:, 1])
+        mono_like = float(np.mean(np.abs(side))) < 1e-5
+        if mono_like:
+            wet = self.force_pseudo_stereo(wet, delay_ms=0.30, blend=0.08)
 
-        out_l = mid + side + body
-        out_r = mid - side + body
-        return np.stack([out_l, out_r], axis=1)
-
-    def process_deep(self, x: np.ndarray) -> np.ndarray:
-        delay_samples = int(self.sr * 0.012)
-        delayed = self.zero_pad_delay(x, delay_samples)
-
-        b, a = signal.butter(1, 4200 / (self.sr / 2.0), btype="low")
-        dark_l = signal.lfilter(b, a, delayed[:, 0])
-        dark_r = signal.lfilter(b, a, delayed[:, 1])
-
-        wet = np.stack([dark_l, dark_r], axis=1) * 0.86
-        dry = x * 0.16
-        return wet + dry
+        return dry + wet
 
     def process(
         self,
         x: np.ndarray,
         preset: str = "WIDE",
     ) -> tuple[np.ndarray, Dict[str, float]]:
-        stereo = self.ensure_stereo(np.asarray(x, dtype=np.float32))
-        pseudo = self.force_pseudo_stereo(stereo)
+        dry = self.ensure_stereo(np.asarray(x, dtype=np.float32))
 
         preset_key = preset.upper()
-        if preset_key == "ZOOM":
-            processed = self.process_zoom(pseudo)
+        if preset_key == "ORIGINAL":
+            processed = self.process_original(dry)
+        elif preset_key == "ZOOM":
+            processed = self.process_zoom(dry)
         elif preset_key == "WIDE":
-            processed = self.process_wide(pseudo)
+            processed = self.process_wide(dry)
         elif preset_key == "DEEP":
-            processed = self.process_deep(pseudo)
+            processed = self.process_deep(dry)
         else:
             raise ValueError(f"Unknown preset: {preset}")
+
+        if preset_key == "ORIGINAL":
+            return processed, {"safety_gain_db": 0.0}
 
         safe, gain_db = self.safe_peak_scale(processed)
         return safe, {"safety_gain_db": float(gain_db)}
