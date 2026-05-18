@@ -7,7 +7,7 @@ from scipy import signal
 
 
 class V3DEngine:
-    """V6.0b2 parallel dry+wet engine for mobile-video stereo sources."""
+    """V6.2 tuned parallel dry+wet engine for mobile-video stereo sources."""
 
     def __init__(self, sr: int = 48000) -> None:
         self.sr = sr
@@ -45,8 +45,8 @@ class V3DEngine:
     def force_pseudo_stereo(
         self,
         x: np.ndarray,
-        delay_ms: float = 0.25,
-        blend: float = 0.10,
+        delay_ms: float = 0.22,
+        blend: float = 0.06,
     ) -> np.ndarray:
         delay_samples = max(1, int(self.sr * delay_ms / 1000.0))
 
@@ -61,31 +61,78 @@ class V3DEngine:
         return dry.copy()
 
     def process_zoom(self, dry: np.ndarray) -> np.ndarray:
+        # Keep dry dominant and center-stable, then add very small band-shaped support.
         mid = 0.5 * (dry[:, 0] + dry[:, 1])
-        b, a = signal.butter(1, 3600 / (self.sr / 2.0), btype="high")
-        presence = signal.lfilter(b, a, mid)
-        wet = np.stack([presence, presence], axis=1) * 0.03
+
+        # Low-mid body recovery (120-350 Hz) for stronger chest/body presence.
+        body_b, body_a = signal.butter(1, [120.0 / (self.sr / 2.0), 350.0 / (self.sr / 2.0)], btype="band")
+        body = signal.lfilter(body_b, body_a, mid)
+
+        # Air/presence recovery (8-12 kHz) to restore openness without harshness.
+        air_b, air_a = signal.butter(1, [8000.0 / (self.sr / 2.0), 12000.0 / (self.sr / 2.0)], btype="band")
+        air = signal.lfilter(air_b, air_a, mid)
+
+        # Very light transient-support path from high-passed dry to retain attack.
+        atk_b, atk_a = signal.butter(1, 3200.0 / (self.sr / 2.0), btype="high")
+        attack = signal.lfilter(atk_b, atk_a, mid)
+
+        wet_mid = 0.020 * body + 0.016 * air + 0.012 * attack
+        wet = np.stack([wet_mid, wet_mid], axis=1)
         return dry + wet
 
     def process_wide(self, dry: np.ndarray) -> np.ndarray:
+        # Preserve center by only widening the side component in controlled bands.
         side = 0.5 * (dry[:, 0] - dry[:, 1])
-        b, a = signal.butter(1, 160.0 / (self.sr / 2.0), btype="high")
-        side_hp = signal.lfilter(b, a, side)
-        wet = np.stack([side_hp, -side_hp], axis=1) * 0.12
-        return dry + wet
+        mid = 0.5 * (dry[:, 0] + dry[:, 1])
+
+        # Side high-pass avoids low-end smear and keeps punch in dry anchor.
+        side_hp_b, side_hp_a = signal.butter(1, 160.0 / (self.sr / 2.0), btype="high")
+        side_hp = signal.lfilter(side_hp_b, side_hp_a, side)
+
+        # Restore body and air in mid to avoid recessed presentation.
+        body_b, body_a = signal.butter(1, [120.0 / (self.sr / 2.0), 350.0 / (self.sr / 2.0)], btype="band")
+        body = signal.lfilter(body_b, body_a, mid)
+        air_b, air_a = signal.butter(1, [8000.0 / (self.sr / 2.0), 12000.0 / (self.sr / 2.0)], btype="band")
+        air = signal.lfilter(air_b, air_a, mid)
+
+        wet_side = np.stack([side_hp, -side_hp], axis=1) * 0.100
+        wet_mid = np.stack([body, body], axis=1) * 0.018 + np.stack([air, air], axis=1) * 0.012
+
+        return dry + wet_side + wet_mid
 
     def process_deep(self, dry: np.ndarray) -> np.ndarray:
-        delay_samples = int(self.sr * 0.010)
+        # Deep ambience should stay spacious but not collapse or lose definition.
+        delay_samples = int(self.sr * 0.008)  # shorter delay keeps attack/body closer.
         delayed = self.zero_pad_delay(dry, delay_samples)
-        dark_b, dark_a = signal.butter(1, 4200 / (self.sr / 2.0), btype="low")
+
+        # Reduce low-pass severity vs V6.0b1 to preserve intelligibility.
+        dark_b, dark_a = signal.butter(1, 6200.0 / (self.sr / 2.0), btype="low")
         dark_l = signal.lfilter(dark_b, dark_a, delayed[:, 0])
         dark_r = signal.lfilter(dark_b, dark_a, delayed[:, 1])
-        wet = np.stack([dark_l, dark_r], axis=1) * 0.16
 
+        # Add anti-collapse side support from delayed side channel.
+        delayed_side = 0.5 * (delayed[:, 0] - delayed[:, 1])
+        side_hp_b, side_hp_a = signal.butter(1, 180.0 / (self.sr / 2.0), btype="high")
+        delayed_side_hp = signal.lfilter(side_hp_b, side_hp_a, delayed_side)
+
+        # Recover low-mid body and top air lightly in the center to avoid dullness.
+        mid = 0.5 * (dry[:, 0] + dry[:, 1])
+        body_b, body_a = signal.butter(1, [120.0 / (self.sr / 2.0), 350.0 / (self.sr / 2.0)], btype="band")
+        body = signal.lfilter(body_b, body_a, mid)
+        air_b, air_a = signal.butter(1, [8000.0 / (self.sr / 2.0), 12000.0 / (self.sr / 2.0)], btype="band")
+        air = signal.lfilter(air_b, air_a, mid)
+
+        wet_dark = np.stack([dark_l, dark_r], axis=1) * 0.120
+        wet_side = np.stack([delayed_side_hp, -delayed_side_hp], axis=1) * 0.050
+        wet_tone = np.stack([body, body], axis=1) * 0.018 + np.stack([air, air], axis=1) * 0.010
+
+        wet = wet_dark + wet_side + wet_tone
+
+        # If source is near-mono, inject tiny cross-delayed decorrelation to prevent collapse.
         side = 0.5 * (dry[:, 0] - dry[:, 1])
         mono_like = float(np.mean(np.abs(side))) < 1e-5
         if mono_like:
-            wet = self.force_pseudo_stereo(wet, delay_ms=0.30, blend=0.08)
+            wet = self.force_pseudo_stereo(wet, delay_ms=0.22, blend=0.06)
 
         return dry + wet
 

@@ -18,6 +18,29 @@ This keeps the source body/center intact while adding only small spatial cues. E
 - **WIDE**: Dry 100% plus side-only wet widening layer.
 - **DEEP**: Dry 100% plus delayed darker ambience/reflection wet layer.
 
+
+## V6.2 Tuning Notes
+
+V6.2 focuses on **energy/body recovery while preserving spatial expansion** from V6.0b2.
+
+Key DSP updates:
+- Stronger **center/mid anchor**: dry remains dominant, wet stays subtle.
+- Added **low-mid recovery (120-350 Hz)** to recover body/impact.
+- Added **air/presence recovery (8-12 kHz)** to reduce dull/recessed tone.
+- Added light **transient support** to retain attack and clarity.
+- **DEEP** mode low-pass is relaxed (less dark), with anti-collapse side support.
+- Near-mono detection in DEEP keeps stereo decorrelation subtle and phase-safe.
+
+Expected listening effect by preset:
+- **ZOOM**: closer to original impact, less weak/recessed.
+- **WIDE**: still wide, but with better body and less hollow center feeling.
+- **DEEP**: deeper ambience without collapsing toward mono, with improved clarity.
+
+Safety posture:
+- Dry path remains primary.
+- No source separation.
+- Peak safety scaling retained.
+
 ## Installation
 
 ```bash
